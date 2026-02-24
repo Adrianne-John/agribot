@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
-// IMPORT YOUR NEW COMPONENTS HERE
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:agribot/components/header.dart';
 import 'package:agribot/components/footer.dart';
+import 'package:agribot/components/stat_card.dart';
+import 'package:agribot/services/firebase_service.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -12,6 +14,7 @@ class DashboardScreen extends StatefulWidget {
 
 class _DashboardScreenState extends State<DashboardScreen> {
   int _selectedIndex = 0;
+  final FirebaseService _firebaseService = FirebaseService();
 
   void _onItemTapped(int index) {
     setState(() {
@@ -22,109 +25,103 @@ class _DashboardScreenState extends State<DashboardScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFE8F5E9),
+      backgroundColor: const Color(0xFFE8F5E9), // Light green background
       body: SafeArea(
         child: Column(
           children: [
-            // CALL THE HEADER COMPONENT
+            // --- HEADER COMPONENT ---
             const AgriBotHeader(),
 
-            // MAIN CONTENT
+            // --- MAIN DASHBOARD CONTENT (Real-time) ---
             Expanded(
-              child: ListView(
-                padding: const EdgeInsets.all(16.0),
-                children: [
-                  // Row 1: Battery and Wifi
-                  Row(
+              child: StreamBuilder<QuerySnapshot>(
+                stream: _firebaseService.getDetectionStream(),
+                builder: (context, snapshot) {
+                  // 1. Handle Loading State
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return const Center(
+                      child: CircularProgressIndicator(color: Color(0xFF00A651)),
+                    );
+                  }
+
+                  // 2. Handle Errors
+                  if (snapshot.hasError) {
+                    return const Center(child: Text("Error loading field data"));
+                  }
+
+                  // 3. Handle Empty Database (No dummy data yet)
+                  if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+                    return _buildEmptyState();
+                  }
+
+                  // 4. Data Processing
+                  final List<QueryDocumentSnapshot> docs = snapshot.data!.docs;
+                  
+                  // Count total neutralized weeds
+                  int neutralizedCount = docs.where((doc) {
+                    final data = doc.data() as Map<String, dynamic>;
+                    return data['eliminated'] == true;
+                  }).length;
+
+                  // Get the confidence level of the most recent weed detection
+                  final latestData = docs.first.data() as Map<String, dynamic>;
+                  String latestConfidence = latestData['confidence_level'] ?? "0%";
+
+                  return ListView(
+                    padding: const EdgeInsets.all(16.0),
                     children: [
-                      Expanded(
-                        child: _buildSmallStatusCard(
-                          icon: Icons.battery_charging_full,
-                          label: "67%",
-                          subLabel: "Settings",
-                          color: Colors.green,
-                        ),
-                      ),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: _buildSmallStatusCard(
-                          icon: Icons.wifi,
-                          label: "WIFI",
-                          subLabel: "Connected",
-                          color: Colors.green,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-
-                  // Row 2: Weeds Neutralized
-                  _buildBigInfoCard(
-                    title: "Weeds Neutralized",
-                    value: "12",
-                    icon: Icons.eco_outlined,
-                    iconColor: Colors.green,
-                  ),
-                  const SizedBox(height: 16),
-
-                  // Row 3: Pest Detections
-                  _buildBigInfoCard(
-                    title: "Pest Detections",
-                    value: "5",
-                    icon: Icons.pest_control,
-                    iconColor: Colors.green,
-                  ),
-                  const SizedBox(height: 16),
-
-                  // Row 4: System Alert
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFFFF54F),
-                      borderRadius: BorderRadius.circular(16),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.1),
-                          blurRadius: 10,
-                          offset: const Offset(0, 4),
-                        ),
-                      ],
-                    ),
-                    child: Row(
-                      children: [
-                        const Icon(Icons.warning_amber_rounded, size: 40, color: Colors.black54),
-                        const SizedBox(width: 16),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: const [
-                              Text(
-                                "System Alert",
-                                style: TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 18,
-                                  color: Colors.black87,
-                                ),
-                              ),
-                              SizedBox(height: 4),
-                              Text(
-                                "High Temperature Detected - Monitoring",
-                                style: TextStyle(fontSize: 12, color: Colors.black54),
-                              ),
-                            ],
+                      // Row 1: Hardware Status
+                      Row(
+                        children: const [
+                          Expanded(
+                            child: AgriBotStatCard(
+                              icon: Icons.battery_charging_full,
+                              value: "85%", 
+                              label: "Battery",
+                            ),
                           ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
+                          SizedBox(width: 16),
+                          Expanded(
+                            child: AgriBotStatCard(
+                              icon: Icons.wifi,
+                              value: "ON", 
+                              label: "Sync Mode",
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 16),
+
+                      // Row 2: Weeds Neutralized (Dynamic)
+                      AgriBotStatCard(
+                        icon: Icons.eco_outlined,
+                        label: "Weeds Neutralized",
+                        value: neutralizedCount.toString(),
+                        isFullWidth: true,
+                      ),
+                      const SizedBox(height: 16),
+
+                      // Row 3: Latest Detection Confidence (Dynamic)
+                      AgriBotStatCard(
+                        icon: Icons.track_changes,
+                        label: "Latest Accuracy",
+                        value: latestConfidence,
+                        isFullWidth: true,
+                        color: Colors.blueGrey,
+                      ),
+                      const SizedBox(height: 16),
+
+                      // Row 4: Alert Box
+                      _buildAlertBox(neutralizedCount > 0),
+                    ],
+                  );
+                },
               ),
             ),
           ],
         ),
       ),
       
-      // CALL THE FOOTER COMPONENT
       bottomNavigationBar: AgriBotFooter(
         currentIndex: _selectedIndex,
         onTap: _onItemTapped,
@@ -132,46 +129,24 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  // --- Helper Widgets (Keep these here or move to a 'widgets' folder later) ---
-
-  Widget _buildSmallStatusCard({
-    required IconData icon,
-    required String label,
-    required String subLabel,
-    required Color color,
-  }) {
-    return Container(
-      padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
+  // UI for when there is no data in Firestore
+  Widget _buildEmptyState() {
+    return Center(
       child: Column(
-        children: [
-          Icon(icon, size: 40, color: color),
-          const SizedBox(height: 12),
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: const [
+          Icon(Icons.cloud_upload_outlined, size: 64, color: Colors.grey),
+          SizedBox(height: 16),
           Text(
-            label,
-            style: TextStyle(
-              fontSize: 22,
-              fontWeight: FontWeight.bold,
-              color: color,
-            ),
+            "Waiting for Data...",
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.grey),
           ),
-          const SizedBox(height: 4),
-          Text(
-            subLabel,
-            style: TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w600,
-              color: color,
+          Padding(
+            padding: EdgeInsets.symmetric(horizontal: 40),
+            child: Text(
+              "Add a document in the Firestore 'detections' collection to see it here.",
+              textAlign: TextAlign.center,
+              style: TextStyle(color: Colors.grey),
             ),
           ),
         ],
@@ -179,16 +154,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  Widget _buildBigInfoCard({
-    required String title,
-    required String value,
-    required IconData icon,
-    required Color iconColor,
-  }) {
+  // Yellow alert box logic
+  Widget _buildAlertBox(bool hasData) {
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: hasData ? const Color(0xFFFFF54F) : Colors.white,
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
@@ -198,30 +169,30 @@ class _DashboardScreenState extends State<DashboardScreen> {
           ),
         ],
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: Row(
         children: [
-          Row(
-            children: [
-              Icon(icon, color: iconColor, size: 28),
-              const SizedBox(width: 12),
-              Text(
-                title,
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: iconColor,
-                ),
-              ),
-            ],
+          Icon(
+            hasData ? Icons.warning_amber_rounded : Icons.check_circle_outline,
+            size: 40,
+            color: hasData ? Colors.black54 : Colors.green,
           ),
-          const SizedBox(height: 16),
-          Text(
-            value,
-            style: TextStyle(
-              fontSize: 48,
-              fontWeight: FontWeight.bold,
-              color: iconColor,
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  hasData ? "System Monitoring" : "System Idle",
+                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  hasData 
+                    ? "Actively processing field detections." 
+                    : "Standing by. Deploy AgriBot to begin.",
+                  style: const TextStyle(fontSize: 12, color: Colors.black54),
+                ),
+              ],
             ),
           ),
         ],

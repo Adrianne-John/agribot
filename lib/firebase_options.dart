@@ -42,21 +42,20 @@ class DefaultFirebaseOptions {
   }
 
   static const FirebaseOptions web = FirebaseOptions(
-    apiKey: 'AIzaSyAhk-_N-zsnnIoVUZxdpWfcysmDD4qTUlE',
-    appId: '1:816395259813:web:6315ec25bb34083646a24c',
-    messagingSenderId: '816395259813',
-    projectId: 'agribot-project-b1947',
-    authDomain: 'agribot-project-b1947.firebaseapp.com',
-    storageBucket: 'agribot-project-b1947.firebasestorage.app',
-    measurementId: 'G-S36YHM295T',
+    apiKey: 'AIzaSyAEY0mwBv8X0QEPtlRK9NGLgelCqrfgUik',
+    appId: '1:414685797737:web:df9af59e66fc0236f2f1f8',
+    messagingSenderId: '414685797737',
+    projectId: 'agribot-production',
+    authDomain: 'agribot-production.firebaseapp.com',
+    storageBucket: 'agribot-production.firebasestorage.app',
   );
 
   static const FirebaseOptions android = FirebaseOptions(
-    apiKey: 'AIzaSyAOoKnp3_hFEsIQbzQR2hsa2ZS1rX-qXJg',
-    appId: '1:816395259813:android:98da4c6e30b30dd746a24c',
-    messagingSenderId: '816395259813',
-    projectId: 'agribot-project-b1947',
-    storageBucket: 'agribot-project-b1947.firebasestorage.app',
+    apiKey: 'AIzaSyBKTCeKFg_qJFiTi08X-Vwe3aZms6Etzns',
+    appId: '1:414685797737:android:d25f65a7dc634ddaf2f1f8',
+    messagingSenderId: '414685797737',
+    projectId: 'agribot-production',
+    storageBucket: 'agribot-production.firebasestorage.app',
   );
 
   static const FirebaseOptions ios = FirebaseOptions(
@@ -78,12 +77,12 @@ class DefaultFirebaseOptions {
   );
 
   static const FirebaseOptions windows = FirebaseOptions(
-    apiKey: 'AIzaSyAhk-_N-zsnnIoVUZxdpWfcysmDD4qTUlE',
-    appId: '1:816395259813:web:2b65cd395a75414f46a24c',
-    messagingSenderId: '816395259813',
-    projectId: 'agribot-project-b1947',
-    authDomain: 'agribot-project-b1947.firebaseapp.com',
-    storageBucket: 'agribot-project-b1947.firebasestorage.app',
-    measurementId: 'G-V4S82GCVZT',
+    apiKey: 'AIzaSyAEY0mwBv8X0QEPtlRK9NGLgelCqrfgUik',
+    appId: '1:414685797737:web:4bf79c2c98e019b6f2f1f8',
+    messagingSenderId: '414685797737',
+    projectId: 'agribot-production',
+    authDomain: 'agribot-production.firebaseapp.com',
+    storageBucket: 'agribot-production.firebasestorage.app',
   );
+
 }

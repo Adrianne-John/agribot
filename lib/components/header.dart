@@ -1,7 +1,13 @@
 import 'package:flutter/material.dart';
 
 class AgriBotHeader extends StatelessWidget {
-  const AgriBotHeader({super.key});
+  /// Shown below "AGRIBOT" (e.g. Dashboard Status, Field Health Map).
+  final String subtitle;
+
+  const AgriBotHeader({
+    super.key,
+    this.subtitle = 'Dashboard Status',
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -28,8 +34,8 @@ class AgriBotHeader extends StatelessWidget {
           const SizedBox(width: 16),
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
-            children: const [
-              Text(
+            children: [
+              const Text(
                 "AGRIBOT",
                 style: TextStyle(
                   color: Colors.white,
@@ -39,8 +45,8 @@ class AgriBotHeader extends StatelessWidget {
                 ),
               ),
               Text(
-                "Dashboard Status",
-                style: TextStyle(
+                subtitle,
+                style: const TextStyle(
                   color: Colors.white70,
                   fontSize: 14,
                 ),

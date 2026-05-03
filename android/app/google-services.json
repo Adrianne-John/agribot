@@ -1,13 +1,13 @@
 {
   "project_info": {
-    "project_number": "816395259813",
-    "project_id": "agribot-project-b1947",
-    "storage_bucket": "agribot-project-b1947.firebasestorage.app"
+    "project_number": "414685797737",
+    "project_id": "agribot-production",
+    "storage_bucket": "agribot-production.firebasestorage.app"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:816395259813:android:98da4c6e30b30dd746a24c",
+        "mobilesdk_app_id": "1:414685797737:android:d25f65a7dc634ddaf2f1f8",
         "android_client_info": {
           "package_name": "com.example.agribot"
         }
@@ -15,7 +15,7 @@
       "oauth_client": [],
       "api_key": [
         {
-          "current_key": "AIzaSyAOoKnp3_hFEsIQbzQR2hsa2ZS1rX-qXJg"
+          "current_key": "AIzaSyBKTCeKFg_qJFiTi08X-Vwe3aZms6Etzns"
         }
       ],
       "services": {

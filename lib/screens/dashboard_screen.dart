@@ -1,135 +1,193 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:agribot/components/header.dart';
-import 'package:agribot/components/footer.dart';
 import 'package:agribot/components/stat_card.dart';
 import 'package:agribot/services/firebase_service.dart';
 
-class DashboardScreen extends StatefulWidget {
+class DashboardScreen extends StatelessWidget {
   const DashboardScreen({super.key});
 
-  @override
-  State<DashboardScreen> createState() => _DashboardScreenState();
-}
+  String _getLatestConfidenceByType(
+    List<QueryDocumentSnapshot> docs,
+    String type,
+  ) {
+    for (final doc in docs) {
+      final data = doc.data() as Map<String, dynamic>;
 
-class _DashboardScreenState extends State<DashboardScreen> {
-  int _selectedIndex = 0;
-  final FirebaseService _firebaseService = FirebaseService();
+      final typeWp = data['type_wp']?.toString().toLowerCase();
+      final confidence = data['confidence_level']?.toString();
 
-  void _onItemTapped(int index) {
-    setState(() {
-      _selectedIndex = index;
-    });
+      if (typeWp == type && confidence != null && confidence.isNotEmpty) {
+        return confidence;
+      }
+    }
+
+    return "0%";
+  }
+
+  int _countNeutralizedByType(
+    List<QueryDocumentSnapshot> docs,
+    String type,
+  ) {
+    return docs.where((doc) {
+      final data = doc.data() as Map<String, dynamic>;
+
+      final isEliminated = data['eliminated'] == true;
+      final typeWp = data['type_wp']?.toString().toLowerCase();
+
+      return isEliminated && typeWp == type;
+    }).length;
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFFE8F5E9), // Light green background
-      body: SafeArea(
-        child: Column(
-          children: [
-            // --- HEADER COMPONENT ---
-            const AgriBotHeader(),
-
-            // --- MAIN DASHBOARD CONTENT (Real-time) ---
-            Expanded(
+    final firebaseService = FirebaseService();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const AgriBotHeader(),
+        Expanded(
               child: StreamBuilder<QuerySnapshot>(
-                stream: _firebaseService.getDetectionStream(),
+                stream: firebaseService.getDetectionStream(),
                 builder: (context, snapshot) {
-                  // 1. Handle Loading State
                   if (snapshot.connectionState == ConnectionState.waiting) {
                     return const Center(
-                      child: CircularProgressIndicator(color: Color(0xFF00A651)),
+                      child: CircularProgressIndicator(
+                        color: Color(0xFF00A651),
+                      ),
                     );
                   }
 
-                  // 2. Handle Errors
                   if (snapshot.hasError) {
-                    return const Center(child: Text("Error loading field data"));
+                    return Center(
+                      child: Padding(
+                        padding: const EdgeInsets.all(16),
+                        child: Text(
+                          "Error loading field data:\n${snapshot.error}",
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(color: Colors.red),
+                        ),
+                      ),
+                    );
                   }
 
-                  // 3. Handle Empty Database (No dummy data yet)
                   if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
                     return _buildEmptyState();
                   }
 
-                  // 4. Data Processing
-                  final List<QueryDocumentSnapshot> docs = snapshot.data!.docs;
-                  
-                  // Count total neutralized weeds
-                  int neutralizedCount = docs.where((doc) {
-                    final data = doc.data() as Map<String, dynamic>;
-                    return data['eliminated'] == true;
-                  }).length;
+                  final List<QueryDocumentSnapshot> docs =
+                      FirebaseService.sortDetectionsByTimestampDesc(
+                    snapshot.data!.docs,
+                  );
 
-                  // Get the confidence level of the most recent weed detection
-                  final latestData = docs.first.data() as Map<String, dynamic>;
-                  String latestConfidence = latestData['confidence_level'] ?? "0%";
+                  final int weedNeutralizedCount =
+                      _countNeutralizedByType(docs, 'weed');
+
+                  final int pestNeutralizedCount =
+                      _countNeutralizedByType(docs, 'pest');
+
+                  final String latestWeedConfidence =
+                      _getLatestConfidenceByType(docs, 'weed');
+
+                  final String latestPestConfidence =
+                      _getLatestConfidenceByType(docs, 'pest');
+
+                  final bool hasData =
+                      weedNeutralizedCount > 0 || pestNeutralizedCount > 0;
 
                   return ListView(
                     padding: const EdgeInsets.all(16.0),
                     children: [
-                      // Row 1: Hardware Status
-                      Row(
-                        children: const [
-                          Expanded(
-                            child: AgriBotStatCard(
-                              icon: Icons.battery_charging_full,
-                              value: "85%", 
-                              label: "Battery",
+                      // IntrinsicHeight: ListView gives unbounded vertical space; stretch
+                      // needs a finite cross-axis — wrap so rows don't get infinite height.
+                      IntrinsicHeight(
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: const [
+                            Expanded(
+                              child: AgriBotStatCard(
+                                icon: Icons.battery_charging_full,
+                                value: "85%",
+                                label: "Battery",
+                              ),
                             ),
-                          ),
-                          SizedBox(width: 16),
-                          Expanded(
-                            child: AgriBotStatCard(
-                              icon: Icons.wifi,
-                              value: "ON", 
-                              label: "Sync Mode",
+                            SizedBox(width: 16),
+                            Expanded(
+                              child: AgriBotStatCard(
+                                icon: Icons.wifi,
+                                value: "ON",
+                                label: "Sync Mode",
+                              ),
                             ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
+
                       const SizedBox(height: 16),
 
-                      // Row 2: Weeds Neutralized (Dynamic)
-                      AgriBotStatCard(
-                        icon: Icons.eco_outlined,
-                        label: "Weeds Neutralized",
-                        value: neutralizedCount.toString(),
-                        isFullWidth: true,
+                      IntrinsicHeight(
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            Expanded(
+                              child: AgriBotStatCard(
+                                icon: Icons.eco_outlined,
+                                label: "Weeds Neutralized",
+                                value: weedNeutralizedCount.toString(),
+                              ),
+                            ),
+                            const SizedBox(width: 16),
+                            Expanded(
+                              child: AgriBotStatCard(
+                                icon: Icons.bug_report_outlined,
+                                label: "Pests Neutralized",
+                                value: pestNeutralizedCount.toString(),
+                                color: Colors.deepOrange,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
+
                       const SizedBox(height: 16),
 
-                      // Row 3: Latest Detection Confidence (Dynamic)
-                      AgriBotStatCard(
-                        icon: Icons.track_changes,
-                        label: "Latest Accuracy",
-                        value: latestConfidence,
-                        isFullWidth: true,
-                        color: Colors.blueGrey,
+                      IntrinsicHeight(
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            Expanded(
+                              child: AgriBotStatCard(
+                                icon: Icons.grass_outlined,
+                                label: "Latest Weed Accuracy",
+                                value: latestWeedConfidence,
+                                color: Colors.blueGrey,
+                              ),
+                            ),
+                            const SizedBox(width: 16),
+                            Expanded(
+                              child: AgriBotStatCard(
+                                icon: Icons.pest_control_outlined,
+                                label: "Latest Pest Accuracy",
+                                value: latestPestConfidence,
+                                color: Colors.brown,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
+
                       const SizedBox(height: 16),
 
-                      // Row 4: Alert Box
-                      _buildAlertBox(neutralizedCount > 0),
+                      _buildAlertBox(hasData),
                     ],
                   );
                 },
               ),
             ),
-          ],
-        ),
-      ),
-      
-      bottomNavigationBar: AgriBotFooter(
-        currentIndex: _selectedIndex,
-        onTap: _onItemTapped,
-      ),
+      ],
     );
   }
 
-  // UI for when there is no data in Firestore
   Widget _buildEmptyState() {
     return Center(
       child: Column(
@@ -139,7 +197,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
           SizedBox(height: 16),
           Text(
             "Waiting for Data...",
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.grey),
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: Colors.grey,
+            ),
           ),
           Padding(
             padding: EdgeInsets.symmetric(horizontal: 40),
@@ -154,7 +216,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  // Yellow alert box logic
   Widget _buildAlertBox(bool hasData) {
     return Container(
       padding: const EdgeInsets.all(16),
@@ -163,7 +224,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withValues(alpha: 0.05),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
@@ -183,14 +244,20 @@ class _DashboardScreenState extends State<DashboardScreen> {
               children: [
                 Text(
                   hasData ? "System Monitoring" : "System Idle",
-                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 18,
+                  ),
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  hasData 
-                    ? "Actively processing field detections." 
-                    : "Standing by. Deploy AgriBot to begin.",
-                  style: const TextStyle(fontSize: 12, color: Colors.black54),
+                  hasData
+                      ? "Actively processing weed and pest detections."
+                      : "Standing by. Deploy AgriBot to begin.",
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: Colors.black54,
+                  ),
                 ),
               ],
             ),

@@ -4,6 +4,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
 import 'package:agribot/screens/app_shell.dart';
+import 'package:agribot/services/map_display_settings.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -24,6 +25,8 @@ void main() async {
       );
     }
   }
+
+  await MapDisplaySettings.load();
 
   runApp(const MyApp());
 }

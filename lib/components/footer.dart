@@ -36,10 +36,6 @@ class AgriBotFooter extends StatelessWidget {
             label: 'Dashboard',
           ),
           BottomNavigationBarItem(
-            icon: Icon(Icons.map_outlined),
-            label: 'Field Map',
-          ),
-          BottomNavigationBarItem(
             icon: Icon(Icons.description_outlined),
             label: 'Data Logs',
           ),

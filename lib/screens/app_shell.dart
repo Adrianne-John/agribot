@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:agribot/components/footer.dart';
 import 'package:agribot/screens/dashboard_screen.dart';
-import 'package:agribot/screens/field_map_screen.dart';
-import 'package:agribot/screens/simple_placeholder_screen.dart';
+import 'package:agribot/screens/data_logs_screen.dart';
+import 'package:agribot/screens/settings_screen.dart';
 
 class AppShell extends StatefulWidget {
   const AppShell({super.key});
@@ -23,15 +23,8 @@ class _AppShellState extends State<AppShell> {
           index: _selectedIndex,
           children: const [
             DashboardScreen(),
-            FieldMapScreen(),
-            SimplePlaceholderScreen(
-              headerSubtitle: 'Data Logs',
-              message: 'Detection history will appear here.',
-            ),
-            SimplePlaceholderScreen(
-              headerSubtitle: 'Settings',
-              message: 'Configure AgriBot from here.',
-            ),
+            DataLogsScreen(),
+            SettingsScreen(),
           ],
         ),
       ),

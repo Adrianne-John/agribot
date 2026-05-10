@@ -60,10 +60,15 @@ class DataLogsScreen extends StatelessWidget {
               final grouped = _groupDocsByCalendarDay(rawDocs);
 
               return ListenableBuilder(
-                listenable: MapDisplaySettings.showNeutralizedOnMap,
+                listenable: Listenable.merge([
+                  MapDisplaySettings.showNeutralizedOnMap,
+                  MapDisplaySettings.showStatusBadgesOnMap,
+                ]),
                 builder: (context, _) {
                   final showNeutralized =
                       MapDisplaySettings.showNeutralizedOnMap.value;
+                  final showStatusBadges =
+                      MapDisplaySettings.showStatusBadgesOnMap.value;
                   return ListView.separated(
                     padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
                     itemCount: grouped.length,
@@ -77,6 +82,7 @@ class DataLogsScreen extends StatelessWidget {
                         day: day,
                         docs: docs,
                         showNeutralizedOnMap: showNeutralized,
+                        showStatusBadgesOnMap: showStatusBadges,
                       );
                     },
                   );
@@ -149,13 +155,84 @@ String _formatDateOnly(DateTime d) {
 }
 
 int _countNeutralized(List<QueryDocumentSnapshot> docs, String typeWp) {
+  double? parseAccuracyPercent(dynamic raw) {
+    if (raw == null) return null;
+    final cleaned = raw.toString().trim().replaceAll('%', '');
+    final parsed = double.tryParse(cleaned);
+    if (parsed == null) return null;
+    if (parsed <= 1) return parsed * 100;
+    return parsed;
+  }
+
+  bool matchesFamily(String? value) {
+    if (typeWp == 'weed') {
+      return value == 'weed' || value == 'weeda' || value == 'weedb';
+    }
+    if (typeWp == 'pest') {
+      return value == 'pest' || value == 'bug' || value == 'bugs';
+    }
+    return value == typeWp;
+  }
+
   return docs.where((doc) {
     final raw = doc.data();
     if (raw is! Map<String, dynamic>) return false;
     final eliminated = raw['eliminated'] == true;
     final tw = raw['type_wp']?.toString().toLowerCase();
-    return eliminated && tw == typeWp;
+    final accuracy = parseAccuracyPercent(raw['neutralization_accuracy']);
+    if (typeWp == 'weed') {
+      return eliminated && matchesFamily(tw) && (accuracy != null && accuracy > 80);
+    }
+    return eliminated && matchesFamily(tw);
   }).length;
+}
+
+double? _parseAccuracyPercent(dynamic raw) {
+  if (raw == null) return null;
+  final cleaned = raw.toString().trim().replaceAll('%', '');
+  final parsed = double.tryParse(cleaned);
+  if (parsed == null) return null;
+  if (parsed <= 1) return parsed * 100;
+  return parsed;
+}
+
+bool _matchesTypeFamily(String? tw, String typeFamily) {
+  if (typeFamily == 'weed') {
+    return tw == 'weed' || tw == 'weeda' || tw == 'weedb';
+  }
+  if (typeFamily == 'pest') {
+    return tw == 'pest' || tw == 'bug' || tw == 'bugs';
+  }
+  return false;
+}
+
+String _formatPercent(double value) {
+  final rounded1 = (value * 10).roundToDouble() / 10;
+  final isWhole = rounded1 == rounded1.roundToDouble();
+  return isWhole ? '${rounded1.toInt()}%' : '${rounded1.toStringAsFixed(1)}%';
+}
+
+String _averageAccuracyForRun({
+  required List<QueryDocumentSnapshot> docs,
+  required String typeFamily,
+  required String fieldName,
+  bool excludeZero = false,
+}) {
+  var sum = 0.0;
+  var count = 0;
+  for (final doc in docs) {
+    final raw = doc.data();
+    if (raw is! Map<String, dynamic>) continue;
+    final tw = raw['type_wp']?.toString().toLowerCase();
+    if (!_matchesTypeFamily(tw, typeFamily)) continue;
+    final val = _parseAccuracyPercent(raw[fieldName]);
+    if (val == null) continue;
+    if (excludeZero && val <= 0) continue;
+    sum += val;
+    count++;
+  }
+  if (count == 0) return '0%';
+  return _formatPercent(sum / count);
 }
 
 class _DailyRunExpansionCard extends StatefulWidget {
@@ -163,12 +240,14 @@ class _DailyRunExpansionCard extends StatefulWidget {
   final DateTime? day;
   final List<QueryDocumentSnapshot> docs;
   final bool showNeutralizedOnMap;
+  final bool showStatusBadgesOnMap;
 
   const _DailyRunExpansionCard({
     required this.runNumber,
     required this.day,
     required this.docs,
     required this.showNeutralizedOnMap,
+    required this.showStatusBadgesOnMap,
   });
 
   @override
@@ -187,6 +266,28 @@ class _DailyRunExpansionCardState extends State<_DailyRunExpansionCard> {
 
     final weedCount = _countNeutralized(widget.docs, 'weed');
     final pestCount = _countNeutralized(widget.docs, 'pest');
+    final avgWeedDetection = _averageAccuracyForRun(
+      docs: widget.docs,
+      typeFamily: 'weed',
+      fieldName: 'confidence_level',
+    );
+    final avgPestDetection = _averageAccuracyForRun(
+      docs: widget.docs,
+      typeFamily: 'pest',
+      fieldName: 'confidence_level',
+    );
+    final avgWeedNeutralization = _averageAccuracyForRun(
+      docs: widget.docs,
+      typeFamily: 'weed',
+      fieldName: 'neutralization_accuracy',
+      excludeZero: true,
+    );
+    final avgPestNeutralization = _averageAccuracyForRun(
+      docs: widget.docs,
+      typeFamily: 'pest',
+      fieldName: 'neutralization_accuracy',
+      excludeZero: true,
+    );
 
     return Material(
       color: Colors.white,
@@ -265,6 +366,56 @@ class _DailyRunExpansionCardState extends State<_DailyRunExpansionCard> {
               ),
             ),
             const SizedBox(height: 14),
+            IntrinsicHeight(
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Expanded(
+                    child: AgriBotStatCard(
+                      icon: Icons.grass_outlined,
+                      label: 'Average Weed Detection Accuracy',
+                      value: avgWeedDetection,
+                      color: Colors.blueGrey,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: AgriBotStatCard(
+                      icon: Icons.pest_control_outlined,
+                      label: 'Average Pest Detection Accuracy',
+                      value: avgPestDetection,
+                      color: Colors.brown,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
+            IntrinsicHeight(
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Expanded(
+                    child: AgriBotStatCard(
+                      icon: Icons.track_changes_outlined,
+                      label: 'Average Weed Neutralization Accuracy',
+                      value: avgWeedNeutralization,
+                      color: Colors.teal,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: AgriBotStatCard(
+                      icon: Icons.gps_fixed,
+                      label: 'Average Pest Neutralization Accuracy',
+                      value: avgPestNeutralization,
+                      color: Colors.deepPurple,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 14),
             FieldPinsFilterBar(
               filter: _filter,
               onChanged: (f) => setState(() => _filter = f),
@@ -274,6 +425,7 @@ class _DailyRunExpansionCardState extends State<_DailyRunExpansionCard> {
               docs: widget.docs,
               filter: _filter,
               showNeutralizedPins: widget.showNeutralizedOnMap,
+              showStatusBadges: widget.showStatusBadgesOnMap,
             ),
           ],
         ),
